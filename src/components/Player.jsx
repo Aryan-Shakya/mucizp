@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X, AlertCircle } from 'lucide-react';
-import ReactPlayer from 'react-player';
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
 export default function Player({ currentSong, onNext, fetchLyrics }) {
   const audioRef = useRef(null);
@@ -13,32 +14,120 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
   const [lyrics, setLyrics] = useState('');
   const [loadingLyrics, setLoadingLyrics] = useState(false);
   const [error, setError] = useState(null);
+  const [loadingAudio, setLoadingAudio] = useState(false);
+  const [audioUrl, setAudioUrl] = useState(null);
 
+  // Fetch audio stream when song changes
   useEffect(() => {
-    if (currentSong) {
-      setIsPlaying(true);
-      setLyrics('');
-      setError(null);
-    }
+    if (!currentSong) return;
+    
+    let cancelled = false;
+    setLoadingAudio(true);
+    setError(null);
+    setAudioUrl(null);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+    setLyrics('');
+
+    const fetchStream = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/stream?video_id=${currentSong.id}`);
+        if (!res.ok) throw new Error('Stream unavailable');
+        const data = await res.json();
+        
+        if (!cancelled && data.url) {
+          setAudioUrl(data.url);
+          setLoadingAudio(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error('Stream error:', e);
+          setError('Could not load audio. Skipping...');
+          setLoadingAudio(false);
+          setTimeout(() => {
+            setError(null);
+            onNext();
+          }, 2500);
+        }
+      }
+    };
+
+    fetchStream();
+    return () => { cancelled = true; };
   }, [currentSong?.id]);
 
+  // Auto-play when audio URL is loaded
+  useEffect(() => {
+    if (audioUrl && audioRef.current) {
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(() => {
+        // Autoplay blocked by browser — user needs to click play
+        setIsPlaying(false);
+      });
+    }
+  }, [audioUrl]);
+
+  // Sync volume
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
   const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
   };
 
   const handleSeek = (e) => {
+    if (!audioRef.current || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
-    if (audioRef.current) {
-      audioRef.current.seekTo(percentage / 100, 'fraction');
-      setProgress(percentage);
+    const fraction = Math.max(0, Math.min(1, x / rect.width));
+    audioRef.current.currentTime = fraction * duration;
+    setProgress(fraction * 100);
+  };
+
+  const handleTimeUpdate = () => {
+    if (!audioRef.current) return;
+    const ct = audioRef.current.currentTime;
+    const dur = audioRef.current.duration || 0;
+    setCurrentTime(ct);
+    if (dur > 0) {
+      setProgress((ct / dur) * 100);
     }
   };
 
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration || 0);
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    onNext();
+  };
+
+  const handleAudioError = () => {
+    setError('Playback failed. Skipping...');
+    setLoadingAudio(false);
+    setTimeout(() => {
+      setError(null);
+      onNext();
+    }, 2000);
+  };
+
   const handleVolumeChange = (e) => {
-    const val = parseFloat(e.target.value);
-    setVolume(val);
+    setVolume(parseFloat(e.target.value));
   };
 
   const toggleLyrics = async () => {
@@ -62,19 +151,23 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const handleError = (e) => {
-    console.error('Player error:', e);
-    setError('This track cannot be played. Trying next...');
-    setTimeout(() => {
-      setError(null);
-      onNext();
-    }, 2000);
-  };
-
   if (!currentSong) return null;
 
   return (
     <>
+      {/* Hidden audio element */}
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onEnded={handleEnded}
+          onError={handleAudioError}
+          preload="auto"
+        />
+      )}
+
       <div className="glass" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 100 }}>
         {/* Error Banner */}
         {error && (
@@ -107,8 +200,8 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
 
           {/* Controls */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', flex: 1 }}>
-            <button onClick={togglePlay} style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--text-primary)', color: 'var(--bg-color)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
-              {currentSong.loadingStream ? <Loader2 size={24} className="animate-spin" /> : isPlaying ? <Pause fill="currentColor" size={24} /> : <Play fill="currentColor" size={24} style={{ marginLeft: '4px' }} />}
+            <button onClick={togglePlay} disabled={loadingAudio} style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--text-primary)', color: 'var(--bg-color)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loadingAudio ? 'wait' : 'pointer', transition: 'transform 0.2s', opacity: loadingAudio ? 0.7 : 1 }}>
+              {loadingAudio ? <Loader2 size={24} className="animate-spin" /> : isPlaying ? <Pause fill="currentColor" size={24} /> : <Play fill="currentColor" size={24} style={{ marginLeft: '4px' }} />}
             </button>
             <button onClick={onNext} style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer' }} title="Skip Forward">
               <SkipForward size={24} />
@@ -125,38 +218,6 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
               <input type="range" min="0" max="1" step="0.01" value={volume} onChange={handleVolumeChange} style={{ width: '80px', accentColor: 'var(--accent)' }} />
             </div>
           </div>
-        </div>
-        
-        {/* Hidden YouTube Player - needs real dimensions to work, hidden off-screen */}
-        <div style={{ position: 'fixed', bottom: '-9999px', left: '-9999px', width: '640px', height: '360px', overflow: 'hidden', pointerEvents: 'none' }}>
-          <ReactPlayer 
-            ref={audioRef}
-            url={`https://www.youtube.com/watch?v=${currentSong.id}`}
-            playing={isPlaying}
-            volume={volume}
-            width="640px"
-            height="360px"
-            onProgress={({ played, playedSeconds }) => {
-              setProgress(played * 100);
-              setCurrentTime(playedSeconds);
-            }}
-            onDuration={(d) => setDuration(d)}
-            onEnded={() => { setIsPlaying(false); onNext(); }}
-            onReady={() => setIsPlaying(true)}
-            onError={handleError}
-            config={{
-              youtube: {
-                playerVars: { 
-                  autoplay: 1,
-                  showinfo: 0, 
-                  controls: 0, 
-                  disablekb: 1,
-                  modestbranding: 1,
-                  origin: window.location.origin
-                }
-              }
-            }}
-          />
         </div>
       </div>
 
@@ -175,6 +236,11 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
           )}
         </div>
       )}
+
+      <style>{`
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+      `}</style>
     </>
   );
 }
