@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X } from 'lucide-react';
-import ReactPlayer from 'react-player/youtube';
+import ReactPlayer from 'react-player';
 
 export default function Player({ currentSong, onNext, fetchLyrics }) {
   const audioRef = useRef(null);
