@@ -8,6 +8,24 @@ import './index.css';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
+// LocalStorage helpers for reliable fallback
+const saveToLocal = (favorites, playlists) => {
+  try {
+    localStorage.setItem('mucizp_favorites', JSON.stringify(favorites));
+    localStorage.setItem('mucizp_playlists', JSON.stringify(playlists));
+  } catch (e) { /* ignore quota errors */ }
+};
+
+const loadFromLocal = () => {
+  try {
+    const favorites = JSON.parse(localStorage.getItem('mucizp_favorites') || '[]');
+    const playlists = JSON.parse(localStorage.getItem('mucizp_playlists') || '[]');
+    return { favorites, playlists };
+  } catch (e) {
+    return { favorites: [], playlists: [] };
+  }
+};
+
 function App() {
   const [songs, setSongs] = useState([]);
   const [currentSong, setCurrentSong] = useState(null);
@@ -27,32 +45,42 @@ function App() {
 
   useEffect(() => {
     const loadData = async () => {
+      // First load from localStorage (instant, always works)
+      const local = loadFromLocal();
+      setFavorites(local.favorites);
+      setPlaylists(local.playlists);
+
+      // Then try Firebase for cross-device sync
       try {
         const docRef = doc(db, 'library', 'data');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setFavorites(data.favorites || []);
-          setPlaylists(data.playlists || []);
-        } else {
-          const oldRef = doc(db, 'library', 'favorites');
-          const oldSnap = await getDoc(oldRef);
-          if (oldSnap.exists()) {
-            setFavorites(oldSnap.data().songs || []);
+          const fbFavs = data.favorites || [];
+          const fbPlaylists = data.playlists || [];
+          // Use Firebase data if it has content (it's the source of truth for cross-device)
+          if (fbFavs.length > 0 || fbPlaylists.length > 0) {
+            setFavorites(fbFavs);
+            setPlaylists(fbPlaylists);
+            saveToLocal(fbFavs, fbPlaylists);
           }
         }
       } catch (e) {
-        console.error("Error loading from Firebase:", e);
+        console.warn("Firebase unavailable, using local storage:", e.message);
       }
     };
     loadData();
   }, []);
 
-  const syncToFirebase = async (newFavs, newPlaylists) => {
+  const syncData = async (newFavs, newPlaylists) => {
+    // Always save to localStorage (reliable)
+    saveToLocal(newFavs, newPlaylists);
+    
+    // Try to sync to Firebase (cross-device)
     try {
       await setDoc(doc(db, 'library', 'data'), { favorites: newFavs, playlists: newPlaylists });
     } catch (e) {
-      console.error("Error saving to Firebase:", e);
+      console.warn("Firebase sync failed:", e.message);
     }
   };
 
@@ -108,7 +136,7 @@ function App() {
       newFavs = [...favorites, song];
     }
     setFavorites(newFavs);
-    syncToFirebase(newFavs, playlists);
+    syncData(newFavs, playlists);
   };
 
   const createPlaylist = (e) => {
@@ -122,7 +150,7 @@ function App() {
     const newPlaylists = [...playlists, newPlaylist];
     setPlaylists(newPlaylists);
     setNewPlaylistName('');
-    syncToFirebase(favorites, newPlaylists);
+    syncData(favorites, newPlaylists);
   };
 
   const addToPlaylist = (playlistId) => {
@@ -137,7 +165,7 @@ function App() {
     });
     setPlaylists(newPlaylists);
     setSongToAdd(null);
-    syncToFirebase(favorites, newPlaylists);
+    syncData(favorites, newPlaylists);
   };
 
   const renderSongList = (list) => {
@@ -256,7 +284,7 @@ function App() {
 
         {activeTab === 'playlist_view' && activePlaylist && (
           <div>
-            <button onClick={() => setActiveTab('library')} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', marginBottom: '16px' }}>← Back to Library</button>
+            <button onClick={() => setActiveTab('library')} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', marginBottom: '16px' }}>&larr; Back to Library</button>
             <h2 style={{ marginBottom: '24px', fontSize: '24px' }}>{activePlaylist.name}</h2>
             {activePlaylist.songs.length > 0 ? renderSongList(activePlaylist.songs) : <p style={{ color: 'var(--text-secondary)' }}>This playlist is empty.</p>}
           </div>

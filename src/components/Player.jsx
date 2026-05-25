@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X } from 'lucide-react';
-import ReactPlayer from 'react-player';
+import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X, AlertCircle } from 'lucide-react';
+import ReactPlayer from 'react-player/youtube';
 
 export default function Player({ currentSong, onNext, fetchLyrics }) {
   const audioRef = useRef(null);
@@ -12,11 +12,13 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
   const [showLyrics, setShowLyrics] = useState(false);
   const [lyrics, setLyrics] = useState('');
   const [loadingLyrics, setLoadingLyrics] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (currentSong) {
       setIsPlaying(true);
-      setLyrics(''); // reset on song change
+      setLyrics('');
+      setError(null);
     }
   }, [currentSong?.id]);
 
@@ -60,11 +62,28 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const handleError = (e) => {
+    console.error('Player error:', e);
+    setError('This track cannot be played. Trying next...');
+    setTimeout(() => {
+      setError(null);
+      onNext();
+    }, 2000);
+  };
+
   if (!currentSong) return null;
 
   return (
     <>
       <div className="glass" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 100 }}>
+        {/* Error Banner */}
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,80,80,0.15)', borderRadius: '8px', color: '#ff6b6b', fontSize: '13px' }}>
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
         {/* Progress Bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)', minWidth: '40px', textAlign: 'right' }}>{formatTime(currentTime)}</span>
@@ -108,26 +127,37 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
           </div>
         </div>
         
-        <ReactPlayer 
-          ref={audioRef}
-          url={`https://www.youtube.com/watch?v=${currentSong.id}`}
-          playing={isPlaying}
-          volume={volume}
-          width="0"
-          height="0"
-          onProgress={({ played, playedSeconds }) => {
-            setProgress(played * 100);
-            setCurrentTime(playedSeconds);
-          }}
-          onDuration={(d) => setDuration(d)}
-          onEnded={() => { setIsPlaying(false); onNext(); }}
-          onReady={() => setIsPlaying(true)}
-          config={{
-            youtube: {
-              playerVars: { showinfo: 0, controls: 0, disablekb: 1 }
-            }
-          }}
-        />
+        {/* Hidden YouTube Player - needs real dimensions to work, hidden off-screen */}
+        <div style={{ position: 'fixed', bottom: '-9999px', left: '-9999px', width: '640px', height: '360px', overflow: 'hidden', pointerEvents: 'none' }}>
+          <ReactPlayer 
+            ref={audioRef}
+            url={`https://www.youtube.com/watch?v=${currentSong.id}`}
+            playing={isPlaying}
+            volume={volume}
+            width="640px"
+            height="360px"
+            onProgress={({ played, playedSeconds }) => {
+              setProgress(played * 100);
+              setCurrentTime(playedSeconds);
+            }}
+            onDuration={(d) => setDuration(d)}
+            onEnded={() => { setIsPlaying(false); onNext(); }}
+            onReady={() => setIsPlaying(true)}
+            onError={handleError}
+            config={{
+              youtube: {
+                playerVars: { 
+                  autoplay: 1,
+                  showinfo: 0, 
+                  controls: 0, 
+                  disablekb: 1,
+                  modestbranding: 1,
+                  origin: window.location.origin
+                }
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* Lyrics Modal */}
