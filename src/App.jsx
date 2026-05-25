@@ -6,7 +6,7 @@ import { db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import './index.css';
 
-const BACKEND_URL = '/api';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
 function App() {
   const [songs, setSongs] = useState([]);
@@ -17,7 +17,6 @@ function App() {
   
   const [favorites, setFavorites] = useState([]);
   const [playlists, setPlaylists] = useState([]);
-  const [loadedDb, setLoadedDb] = useState(false);
 
   const [songToAdd, setSongToAdd] = useState(null); 
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -45,22 +44,17 @@ function App() {
       } catch (e) {
         console.error("Error loading from Firebase:", e);
       }
-      setLoadedDb(true);
     };
     loadData();
   }, []);
 
-  useEffect(() => {
-    if (!loadedDb) return;
-    const saveData = async () => {
-      try {
-        await setDoc(doc(db, 'library', 'data'), { favorites, playlists });
-      } catch (e) {
-        console.error("Error saving to Firebase:", e);
-      }
-    };
-    saveData();
-  }, [favorites, playlists, loadedDb]);
+  const syncToFirebase = async (newFavs, newPlaylists) => {
+    try {
+      await setDoc(doc(db, 'library', 'data'), { favorites: newFavs, playlists: newPlaylists });
+    } catch (e) {
+      console.error("Error saving to Firebase:", e);
+    }
+  };
 
   const handleSearch = async (query) => {
     setLoading(true);
@@ -116,11 +110,14 @@ function App() {
 
   const toggleFavorite = (song, e) => {
     e.stopPropagation();
+    let newFavs;
     if (favorites.find(f => f.id === song.id)) {
-      setFavorites(favorites.filter(f => f.id !== song.id));
+      newFavs = favorites.filter(f => f.id !== song.id);
     } else {
-      setFavorites([...favorites, song]);
+      newFavs = [...favorites, song];
     }
+    setFavorites(newFavs);
+    syncToFirebase(newFavs, playlists);
   };
 
   const createPlaylist = (e) => {
@@ -131,21 +128,25 @@ function App() {
       name: newPlaylistName.trim(),
       songs: []
     };
-    setPlaylists([...playlists, newPlaylist]);
+    const newPlaylists = [...playlists, newPlaylist];
+    setPlaylists(newPlaylists);
     setNewPlaylistName('');
+    syncToFirebase(favorites, newPlaylists);
   };
 
   const addToPlaylist = (playlistId) => {
     if (!songToAdd) return;
-    setPlaylists(playlists.map(pl => {
+    const newPlaylists = playlists.map(pl => {
       if (pl.id === playlistId) {
         if (!pl.songs.find(s => s.id === songToAdd.id)) {
           return { ...pl, songs: [...pl.songs, songToAdd] };
         }
       }
       return pl;
-    }));
+    });
+    setPlaylists(newPlaylists);
     setSongToAdd(null);
+    syncToFirebase(favorites, newPlaylists);
   };
 
   const renderSongList = (list) => {
