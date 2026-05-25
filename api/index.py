@@ -51,7 +51,8 @@ def get_stream_url(video_id: str):
         ydl_opts = {
             'format': 'bestaudio/best',
             'noplaylist': True,
-            'quiet': True
+            'quiet': True,
+            'extractor_args': {'youtube': {'client': ['android']}}
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
