@@ -1,16 +1,47 @@
-# React + Vite
+# 🎵 Mucizp — Free Music Streaming
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A personal music streaming web app. Search, play, and organize your favorite songs with playlists and favorites.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 🔍 **Search** — Find songs via YouTube Music
+- 🎧 **Stream** — Play audio directly in the browser
+- ❤️ **Favorites** — Save songs you love (synced via Firebase)
+- 📋 **Playlists** — Create and manage custom playlists
+- 📜 **Lyrics** — View lyrics for the currently playing song
+- 🎨 **Dark UI** — Glassmorphism design with smooth animations
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 19, Vite 8, Lucide Icons |
+| Backend | FastAPI, ytmusicapi |
+| Database | Firebase Firestore |
+| Playback | ReactPlayer (YouTube) |
+| Hosting | Vercel (frontend) + Hugging Face Spaces (backend) |
 
-## Expanding the ESLint configuration
+## Local Development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Frontend
+```bash
+npm install
+npm run dev
+```
+
+### Backend
+```bash
+pip install -r requirements.txt
+uvicorn api.index:app --reload --port 8000
+```
+
+Set `VITE_BACKEND_URL=http://localhost:8000` in a `.env` file for local dev.
+
+## Deployment
+
+- **Frontend**: Deployed on [Vercel](https://vercel.com) — auto-deploys from GitHub
+- **Backend**: Deployed on [Hugging Face Spaces](https://huggingface.co/spaces) via Docker
+
+## License
+
+MIT
