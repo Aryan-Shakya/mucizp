@@ -23,6 +23,7 @@ def read_root():
     return {"message": "Mucizp Backend is running!"}
 
 @app.get("/api/search")
+@app.get("/search")
 def search_songs(q: str):
     try:
         # Search for songs specifically to get clean audio tracks
@@ -43,6 +44,7 @@ def search_songs(q: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stream")
+@app.get("/stream")
 def get_stream_url(video_id: str):
     try:
         url = f"https://www.youtube.com/watch?v={video_id}"
