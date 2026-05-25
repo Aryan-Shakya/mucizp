@@ -6,7 +6,7 @@ import { db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import './index.css';
 
-const BACKEND_URL = '';
+const BACKEND_URL = '/api';
 
 function App() {
   const [songs, setSongs] = useState([]);
