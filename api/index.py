@@ -22,7 +22,7 @@ ytmusic = YTMusic()
 def read_root():
     return {"message": "Mucizp Backend is running!"}
 
-@app.get("/search")
+@app.get("/api/search")
 def search_songs(q: str):
     try:
         # Search for songs specifically to get clean audio tracks
@@ -42,7 +42,7 @@ def search_songs(q: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/stream")
+@app.get("/api/stream")
 def get_stream_url(video_id: str):
     try:
         url = f"https://www.youtube.com/watch?v={video_id}"
