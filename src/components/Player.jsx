@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X } from 'lucide-react';
+import ReactPlayer from 'react-player/youtube';
 
 export default function Player({ currentSong, onNext, fetchLyrics }) {
   const audioRef = useRef(null);
@@ -13,31 +14,14 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
   const [loadingLyrics, setLoadingLyrics] = useState(false);
 
   useEffect(() => {
-    if (currentSong?.streamUrl && audioRef.current) {
-      audioRef.current.play();
+    if (currentSong) {
       setIsPlaying(true);
       setLyrics(''); // reset on song change
     }
-  }, [currentSong?.streamUrl]);
+  }, [currentSong?.id]);
 
   const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) audioRef.current.pause();
-      else audioRef.current.play();
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      const current = audioRef.current.currentTime;
-      const total = audioRef.current.duration;
-      if (total > 0) {
-        setProgress((current / total) * 100);
-        setCurrentTime(current);
-        setDuration(total);
-      }
-    }
+    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (e) => {
@@ -45,7 +29,7 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
     const x = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
     if (audioRef.current) {
-      audioRef.current.currentTime = (percentage / 100) * audioRef.current.duration;
+      audioRef.current.seekTo(percentage / 100, 'fraction');
       setProgress(percentage);
     }
   };
@@ -53,7 +37,6 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
   const handleVolumeChange = (e) => {
     const val = parseFloat(e.target.value);
     setVolume(val);
-    if (audioRef.current) audioRef.current.volume = val;
   };
 
   const toggleLyrics = async () => {
@@ -125,14 +108,26 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
           </div>
         </div>
         
-        {currentSong.streamUrl && (
-          <audio 
-            ref={audioRef}
-            src={currentSong.streamUrl}
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={() => { setIsPlaying(false); onNext(); }}
-          />
-        )}
+        <ReactPlayer 
+          ref={audioRef}
+          url={`https://www.youtube.com/watch?v=${currentSong.id}`}
+          playing={isPlaying}
+          volume={volume}
+          width="0"
+          height="0"
+          onProgress={({ played, playedSeconds }) => {
+            setProgress(played * 100);
+            setCurrentTime(playedSeconds);
+          }}
+          onDuration={(d) => setDuration(d)}
+          onEnded={() => { setIsPlaying(false); onNext(); }}
+          onReady={() => setIsPlaying(true)}
+          config={{
+            youtube: {
+              playerVars: { showinfo: 0, controls: 0, disablekb: 1 }
+            }
+          }}
+        />
       </div>
 
       {/* Lyrics Modal */}

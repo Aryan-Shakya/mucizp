@@ -70,7 +70,7 @@ function App() {
   };
 
   const playSong = async (song, fullQueue = null, index = 0) => {
-    setCurrentSong({ ...song, loadingStream: true });
+    setCurrentSong({ ...song, loadingStream: false });
     
     if (fullQueue) {
       setQueue(fullQueue);
@@ -79,31 +79,6 @@ function App() {
       setQueue([song]);
       setQueueIndex(0);
     }
-
-    const apis = [
-      `https://pipedapi.kavin.rocks/streams/${song.id}`,
-      `https://pipedapi.smnz.de/streams/${song.id}`,
-      `${BACKEND_URL}/stream?video_id=${song.id}`
-    ];
-    
-    for (let api of apis) {
-      try {
-        const response = await fetch(api);
-        const data = await response.json();
-        if (data.audioStreams && data.audioStreams.length > 0) {
-          const audioStream = data.audioStreams.find(s => s.mimeType.startsWith('audio/webm')) || data.audioStreams[0];
-          setCurrentSong({ ...song, streamUrl: audioStream.url, loadingStream: false });
-          return;
-        } else if (data.url) {
-          setCurrentSong({ ...song, streamUrl: data.url, loadingStream: false });
-          return;
-        }
-      } catch (err) {
-        console.warn(`Stream API failed, trying next...`, err);
-      }
-    }
-    console.error('All streaming APIs failed');
-    setCurrentSong({ ...song, loadingStream: false });
   };
 
   const playNext = () => {
