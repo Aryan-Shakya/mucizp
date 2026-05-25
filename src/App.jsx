@@ -76,39 +76,34 @@ function App() {
       setQueue(fullQueue);
       setQueueIndex(index);
     } else {
-      const handlePlay = async (song) => {
-        setCurrentSong(song);
-        // Assuming setIsPlaying and setStreamUrl are available via context or state
-        // This is a minimal implementation of the requested change logic within playSong
-        const apis = [
-          `https://pipedapi.kavin.rocks/streams/${song.id}`,
-          `https://pipedapi.smnz.de/streams/${song.id}`,
-          `${BACKEND_URL}/stream?video_id=${song.id}`
-        ];
-        
-        for (let api of apis) {
-          try {
-            const response = await fetch(api);
-            const data = await response.json();
-            if (data.audioStreams && data.audioStreams.length > 0) {
-              const audioStream = data.audioStreams.find(s => s.mimeType.startsWith('audio/webm')) || data.audioStreams[0];
-              setCurrentSong({ ...song, streamUrl: audioStream.url, loadingStream: false });
-              return;
-            } else if (data.url) {
-              setCurrentSong({ ...song, streamUrl: data.url, loadingStream: false });
-              return;
-            }
-          } catch (err) {
-            console.warn(`Stream API failed, trying next...`, err);
-          }
-        }
-        console.error('All streaming APIs failed');
-      };
-      
-      handlePlay(song);
       setQueue([song]);
       setQueueIndex(0);
     }
+
+    const apis = [
+      `https://pipedapi.kavin.rocks/streams/${song.id}`,
+      `https://pipedapi.smnz.de/streams/${song.id}`,
+      `${BACKEND_URL}/stream?video_id=${song.id}`
+    ];
+    
+    for (let api of apis) {
+      try {
+        const response = await fetch(api);
+        const data = await response.json();
+        if (data.audioStreams && data.audioStreams.length > 0) {
+          const audioStream = data.audioStreams.find(s => s.mimeType.startsWith('audio/webm')) || data.audioStreams[0];
+          setCurrentSong({ ...song, streamUrl: audioStream.url, loadingStream: false });
+          return;
+        } else if (data.url) {
+          setCurrentSong({ ...song, streamUrl: data.url, loadingStream: false });
+          return;
+        }
+      } catch (err) {
+        console.warn(`Stream API failed, trying next...`, err);
+      }
+    }
+    console.error('All streaming APIs failed');
+    setCurrentSong({ ...song, loadingStream: false });
   };
 
   const playNext = () => {
