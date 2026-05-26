@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Mucizp - Music Player",
+  "version": "1.0.0",
+  "description": "Your ultimate, cross-platform music streaming experience.",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "Open Mucizp"
+  },
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "permissions": [
+    "storage"
+  ]
+}
