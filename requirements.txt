@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-ytmusicapi
 pydantic
 requests
-yt-dlp
+pyDes

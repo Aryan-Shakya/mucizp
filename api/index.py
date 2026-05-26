@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from ytmusicapi import YTMusic
-import yt_dlp
 import requests
 import uvicorn
+from pyDes import des, ECB, PAD_PKCS5
+import base64
+import html
 
 app = FastAPI(title="Mucizp Backend")
 
@@ -15,8 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ytmusic = YTMusic()
-
 @app.get("/")
 def read_root():
     return {"message": "Mucizp Backend is running!"}
@@ -25,75 +24,66 @@ def read_root():
 @app.get("/search")
 def search_songs(q: str):
     try:
-        results = ytmusic.search(q, filter="songs")
+        url = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&query={q}&_format=json&_marker=0&ctx=web6dot0"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        
         songs = []
-        for res in results[:10]:
-            if 'videoId' in res:
-                songs.append({
-                    "id": res['videoId'],
-                    "title": res['title'],
-                    "artists": [a['name'] for a in res.get('artists', [])],
-                    "thumbnail": res['thumbnails'][-1]['url'] if res.get('thumbnails') else "",
-                    "duration": res.get('duration', ""),
-                })
+        # JioSaavn autocomplete returns songs in data['songs']['data']
+        items = data.get('songs', {}).get('data', [])
+        
+        for item in items[:15]:
+            # Clean up the title (JioSaavn sometimes HTML encodes strings)
+            title = html.unescape(item.get('title', ''))
+            description = html.unescape(item.get('description', ''))
+            
+            # The description usually contains "Song by Artist" or just "Artists", let's extract artist if possible
+            artists_str = description.replace("Song by ", "").strip()
+            # Split by comma if multiple
+            artists = [a.strip() for a in artists_str.split(',')] if artists_str else []
+            
+            # Use high-res image if possible
+            image = item.get('image', '').replace("50x50", "500x500")
+            
+            songs.append({
+                "id": item.get('id'),
+                "title": title,
+                "artists": artists,
+                "thumbnail": image,
+                "duration": 0, # Duration not available in autocomplete
+            })
+            
         return {"songs": songs}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# List of yt-dlp client configs to try, in order of reliability
-YDL_CONFIGS = [
-    {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'extractor_args': {'youtube': {'client': ['android_vr']}},
-    },
-    {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'extractor_args': {'youtube': {'client': ['android_creator']}},
-    },
-    {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'extractor_args': {'youtube': {'client': ['tv']}},
-    },
-    {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'extractor_args': {'youtube': {'client': ['mediaconnect']}},
-    },
-]
-
 @app.get("/api/stream")
 @app.get("/stream")
 def get_stream_url(video_id: str):
-    """Extract audio stream URL using yt-dlp with multiple client fallbacks"""
-    url = f"https://music.youtube.com/watch?v={video_id}"
-    errors = []
-    
-    for i, opts in enumerate(YDL_CONFIGS):
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                audio_url = info.get('url')
-                if audio_url:
-                    return {"url": audio_url}
-        except Exception as e:
-            errors.append(f"Client {i}: {str(e)[:100]}")
-            continue
-    
-    raise HTTPException(
-        status_code=503,
-        detail=f"All extraction methods failed: {'; '.join(errors)}"
-    )
+    try:
+        url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={video_id}&_format=json&_marker=0&ctx=web6dot0"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        
+        song_info = data.get('songs', [])[0] if data.get('songs') else {}
+        encrypted_url = song_info.get('encrypted_media_url')
+        
+        if not encrypted_url:
+            raise HTTPException(status_code=404, detail="No audio stream found for this ID")
+            
+        des_cipher = des(b"38346591", ECB, b"\0\0\0\0\0\0\0\0", pad=None, padmode=PAD_PKCS5)
+        enc_url = base64.b64decode(encrypted_url.strip())
+        dec_url = des_cipher.decrypt(enc_url, padmode=PAD_PKCS5).decode('utf-8')
+        
+        # Try to get highest quality (320kbps)
+        dec_url = dec_url.replace("_96.mp4", "_320.mp4")
+        
+        return {"url": dec_url}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/lyrics")
 @app.get("/lyrics")
