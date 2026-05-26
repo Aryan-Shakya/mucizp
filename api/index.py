@@ -5,6 +5,7 @@ import uvicorn
 from pyDes import des, ECB, PAD_PKCS5
 import base64
 import html
+from ytmusicapi import YTMusic
 
 app = FastAPI(title="Mucizp Backend")
 
@@ -120,6 +121,30 @@ def get_lyrics(artist: str = "", title: str = ""):
         return {"lyrics": "Lyrics request timed out."}
     except Exception:
         return {"lyrics": "Could not fetch lyrics."}
+
+@app.get("/api/youtube")
+@app.get("/youtube")
+def get_youtube_playlist(id: str):
+    try:
+        ytmusic = YTMusic()
+        playlist = ytmusic.get_playlist(id)
+        
+        songs = []
+        for track in playlist.get('tracks', []):
+            title = track.get('title', '')
+            artists = [a.get('name', '') for a in track.get('artists', [])]
+            if title:
+                songs.append({
+                    "title": title,
+                    "artist": artists[0] if artists else ""
+                })
+                
+        return {
+            "title": playlist.get('title', 'YouTube Playlist'),
+            "songs": songs
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch playlist: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("api.index:app", host="0.0.0.0", port=7860, reload=True)

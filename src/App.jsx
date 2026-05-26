@@ -50,6 +50,10 @@ function App() {
   
   const [recentHistory, setRecentHistory] = useState([]);
 
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(null);
+
   useEffect(() => {
     const loadData = async () => {
       // First load from localStorage (instant, always works)
@@ -214,6 +218,66 @@ function App() {
     syncData(favorites, newPlaylists, recentHistory);
   };
 
+  const importYouTubePlaylist = async (e) => {
+    e.preventDefault();
+    if (!youtubeUrl.trim() || importing) return;
+    
+    const listMatch = youtubeUrl.match(/[?&]list=([^#\&\?]+)/);
+    if (!listMatch) {
+      alert("Invalid YouTube Playlist URL. Must contain 'list='");
+      return;
+    }
+    const playlistId = listMatch[1];
+    
+    setImporting(true);
+    setImportProgress({ current: 0, total: 0, status: 'Fetching playlist from YouTube...' });
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/youtube?id=${playlistId}`);
+      if (!res.ok) throw new Error("Failed to fetch playlist");
+      const ytData = await res.json();
+      
+      const tracks = ytData.songs || [];
+      if (tracks.length === 0) throw new Error("Playlist is empty or private");
+      
+      setImportProgress({ current: 0, total: tracks.length, status: `Searching for ${tracks.length} songs...` });
+      
+      const newPlaylist = {
+        id: Date.now().toString(),
+        name: ytData.title + ' (YouTube)',
+        songs: []
+      };
+      
+      for (let i = 0; i < tracks.length; i++) {
+        setImportProgress({ current: i, total: tracks.length, status: `Searching: ${tracks[i].title}...` });
+        try {
+          const query = `${tracks[i].title} ${tracks[i].artist}`.trim();
+          const searchRes = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(query)}`);
+          const searchData = await searchRes.json();
+          if (searchData.songs && searchData.songs.length > 0) {
+            newPlaylist.songs.push(searchData.songs[0]);
+          }
+        } catch(e) {
+          console.warn("Failed to find song", tracks[i].title);
+        }
+      }
+      
+      const newPlaylists = [...playlists, newPlaylist];
+      setPlaylists(newPlaylists);
+      syncData(favorites, newPlaylists, recentHistory);
+      
+      setYoutubeUrl('');
+      setImportProgress({ current: tracks.length, total: tracks.length, status: 'Import complete!' });
+      setTimeout(() => setImportProgress(null), 3000);
+      
+    } catch (err) {
+      alert("Error importing playlist: " + err.message);
+      setImportProgress(null);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const renderSongList = (list) => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -376,6 +440,29 @@ function App() {
 
             <div>
               <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Your Playlists</h2>
+              
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid var(--border-color)' }}>
+                <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Import from YouTube</h3>
+                <form onSubmit={importYouTubePlaylist} style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input type="text" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="Paste YouTube Playlist URL..." style={{ flex: 1, padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: '#fff', outline: 'none' }} disabled={importing} />
+                    <button type="submit" disabled={importing} style={{ padding: '10px 20px', borderRadius: '8px', background: 'var(--accent)', color: '#000', border: 'none', fontWeight: '600', cursor: importing ? 'not-allowed' : 'pointer', opacity: importing ? 0.7 : 1 }}>
+                      {importing ? 'Importing...' : 'Import'}
+                    </button>
+                  </div>
+                  {importProgress && (
+                    <div style={{ marginTop: '8px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      <p>{importProgress.status}</p>
+                      {importProgress.total > 0 && (
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginTop: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: `${(importProgress.current / importProgress.total) * 100}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.3s' }}></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </form>
+              </div>
+
               <form onSubmit={createPlaylist} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                 <input type="text" value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)} placeholder="New playlist name..." style={{ flex: 1, padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.05)', color: '#fff', outline: 'none' }} />
                 <button type="submit" style={{ padding: '10px 20px', borderRadius: '8px', background: 'var(--accent)', color: '#000', border: 'none', fontWeight: '600', cursor: 'pointer' }}>Create</button>
