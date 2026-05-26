@@ -54,6 +54,9 @@ function App() {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(null);
 
+  const [editingPlaylistId, setEditingPlaylistId] = useState(null);
+  const [editPlaylistName, setEditPlaylistName] = useState('');
+
   useEffect(() => {
     const loadData = async () => {
       // First load from localStorage (instant, always works)
@@ -218,6 +221,24 @@ function App() {
     syncData(favorites, newPlaylists, recentHistory);
   };
 
+  const handleRenamePlaylist = (e) => {
+    e.preventDefault();
+    if (!editPlaylistName.trim() || !editingPlaylistId) return;
+    
+    const newPlaylists = playlists.map(pl => {
+      if (pl.id === editingPlaylistId) {
+        const updated = { ...pl, name: editPlaylistName.trim() };
+        if (activePlaylist && activePlaylist.id === pl.id) setActivePlaylist(updated);
+        return updated;
+      }
+      return pl;
+    });
+    
+    setPlaylists(newPlaylists);
+    syncData(favorites, newPlaylists, recentHistory);
+    setEditingPlaylistId(null);
+  };
+
   const importYouTubePlaylist = async (e) => {
     e.preventDefault();
     if (!youtubeUrl.trim() || importing) return;
@@ -358,7 +379,58 @@ function App() {
           songs.length > 0 ? renderSongList(songs) : (
             <div>
               <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '24px' }}>{getGreeting()}</h2>
-              <h3 style={{ fontSize: '18px', color: 'var(--text-secondary)', marginBottom: '16px' }}>Trending Suggestions</h3>
+              
+              {/* Spotify-style Top Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                gap: '12px',
+                marginBottom: '32px'
+              }}>
+                {favorites.length > 0 && (
+                  <div 
+                    onClick={() => { setActiveTab('library'); }}
+                    style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '4px', display: 'flex', alignItems: 'center', cursor: 'pointer', overflow: 'hidden', transition: 'background 0.2s' }}
+                    onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                  >
+                    <div style={{ width: '64px', height: '64px', background: 'linear-gradient(135deg, #450af5, #c4efd9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Heart size={24} fill="#fff" color="#fff" />
+                    </div>
+                    <span style={{ fontWeight: 'bold', padding: '0 16px' }}>Liked Songs</span>
+                  </div>
+                )}
+                
+                {playlists.slice(0, 3).map(pl => (
+                  <div 
+                    key={pl.id}
+                    onClick={() => { setActivePlaylist(pl); setActiveTab('playlist_view'); }}
+                    style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '4px', display: 'flex', alignItems: 'center', cursor: 'pointer', overflow: 'hidden', transition: 'background 0.2s' }}
+                    onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                  >
+                    <div style={{ width: '64px', height: '64px', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ListMusic size={24} color="#b3b3b3" />
+                    </div>
+                    <span style={{ fontWeight: 'bold', padding: '0 16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{pl.name}</span>
+                  </div>
+                ))}
+
+                {recentHistory.slice(0, 4).map((song, i) => (
+                  <div 
+                    key={`grid-hist-${song.id}`}
+                    onClick={() => playSong(song, recentHistory, i)}
+                    style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '4px', display: 'flex', alignItems: 'center', cursor: 'pointer', overflow: 'hidden', transition: 'background 0.2s' }}
+                    onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                  >
+                    <img src={song.thumbnail} alt={song.title} style={{ width: '64px', height: '64px', objectFit: 'cover' }} />
+                    <span style={{ fontWeight: 'bold', padding: '0 16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{song.title}</span>
+                  </div>
+                ))}
+              </div>
+
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Trending Suggestions</h3>
               {loadingSuggestions ? (
                 <p style={{ color: 'var(--text-secondary)' }}>Loading suggestions...</p>
               ) : homeSuggestions.length > 0 ? (
@@ -484,7 +556,32 @@ function App() {
         {activeTab === 'playlist_view' && activePlaylist && (
           <div>
             <button onClick={() => setActiveTab('library')} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', marginBottom: '16px' }}>&larr; Back to Library</button>
-            <h2 style={{ marginBottom: '24px', fontSize: '24px' }}>{activePlaylist.name}</h2>
+            
+            {editingPlaylistId === activePlaylist.id ? (
+              <form onSubmit={handleRenamePlaylist} style={{ marginBottom: '24px', display: 'flex', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  value={editPlaylistName} 
+                  onChange={(e) => setEditPlaylistName(e.target.value)}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid var(--accent)', color: '#fff', fontSize: '24px', fontWeight: 'bold', padding: '8px', borderRadius: '8px', outline: 'none' }}
+                  autoFocus
+                />
+                <button type="submit" style={{ background: 'var(--accent)', color: '#000', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                <button type="button" onClick={() => setEditingPlaylistId(null)} style={{ background: 'transparent', color: '#fff', border: 'none', padding: '8px', cursor: 'pointer' }}>Cancel</button>
+              </form>
+            ) : (
+              <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <h2 style={{ fontSize: '32px', fontWeight: 'bold', margin: 0 }}>{activePlaylist.name}</h2>
+                <button 
+                  onClick={() => { setEditingPlaylistId(activePlaylist.id); setEditPlaylistName(activePlaylist.name); }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
+                  title="Rename Playlist"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                </button>
+              </div>
+            )}
+            
             {activePlaylist.songs.length > 0 ? renderSongList(activePlaylist.songs) : <p style={{ color: 'var(--text-secondary)' }}>This playlist is empty.</p>}
           </div>
         )}
