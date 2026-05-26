@@ -127,8 +127,14 @@ def get_lyrics(artist: str = "", title: str = ""):
 def get_youtube_playlist(id: str):
     try:
         ytmusic = YTMusic()
-        playlist = ytmusic.get_playlist(id)
-        
+        if id.startswith("RD"):
+            # It's a YouTube Mix playlist, which requires get_watch_playlist
+            playlist = ytmusic.get_watch_playlist(playlistId=id)
+            playlist_title = "YouTube Mix"
+        else:
+            playlist = ytmusic.get_playlist(id)
+            playlist_title = playlist.get('title', 'YouTube Playlist')
+            
         songs = []
         for track in playlist.get('tracks', []):
             title = track.get('title', '')
@@ -140,7 +146,7 @@ def get_youtube_playlist(id: str):
                 })
                 
         return {
-            "title": playlist.get('title', 'YouTube Playlist'),
+            "title": playlist_title,
             "songs": songs
         }
     except Exception as e:
