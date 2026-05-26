@@ -24,33 +24,42 @@ def read_root():
 @app.get("/search")
 def search_songs(q: str):
     try:
-        url = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&query={q}&_format=json&_marker=0&ctx=web6dot0"
-        response = requests.get(url, timeout=10)
-        data = response.json()
+        url = f"https://www.jiosaavn.com/api.php?__call=search.getResults&q={q}&n=15&p=1&_format=json&_marker=0&ctx=web6dot0"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        try:
+            data = response.json()
+        except Exception:
+            raise HTTPException(status_code=502, detail="Failed to parse JioSaavn search response. Possibly blocked by Cloudflare.")
         
         songs = []
-        # JioSaavn autocomplete returns songs in data['songs']['data']
-        items = data.get('songs', {}).get('data', [])
+        items = data.get('results', [])
         
-        for item in items[:15]:
-            # Clean up the title (JioSaavn sometimes HTML encodes strings)
-            title = html.unescape(item.get('title', ''))
-            description = html.unescape(item.get('description', ''))
+        for item in items:
+            title = html.unescape(item.get('song', item.get('title', '')))
             
-            # The description usually contains "Song by Artist" or just "Artists", let's extract artist if possible
-            artists_str = description.replace("Song by ", "").strip()
-            # Split by comma if multiple
+            # Extract artists
+            artists_str = item.get('singers') or item.get('primary_artists') or ""
+            artists_str = html.unescape(artists_str)
             artists = [a.strip() for a in artists_str.split(',')] if artists_str else []
             
-            # Use high-res image if possible
-            image = item.get('image', '').replace("50x50", "500x500")
+            # Use high-res image
+            image = item.get('image', '').replace("150x150", "500x500").replace("50x50", "500x500")
             
+            try:
+                duration = int(item.get('duration', 0))
+            except:
+                duration = 0
+                
             songs.append({
                 "id": item.get('id'),
                 "title": title,
                 "artists": artists,
                 "thumbnail": image,
-                "duration": 0, # Duration not available in autocomplete
+                "duration": duration,
             })
             
         return {"songs": songs}
@@ -62,8 +71,15 @@ def search_songs(q: str):
 def get_stream_url(video_id: str):
     try:
         url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={video_id}&_format=json&_marker=0&ctx=web6dot0"
-        response = requests.get(url, timeout=10)
-        data = response.json()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        try:
+            data = response.json()
+        except Exception:
+            raise HTTPException(status_code=502, detail="Failed to parse JioSaavn response. Possibly blocked by Cloudflare.")
         
         song_info = data.get('songs', [])[0] if data.get('songs') else {}
         encrypted_url = song_info.get('encrypted_media_url')
