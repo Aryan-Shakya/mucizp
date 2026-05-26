@@ -66,11 +66,13 @@ function App() {
           const data = docSnap.data();
           const fbFavs = data.favorites || [];
           const fbPlaylists = data.playlists || [];
+          const fbHistory = data.history || [];
           // Use Firebase data if it has content (it's the source of truth for cross-device)
-          if (fbFavs.length > 0 || fbPlaylists.length > 0) {
+          if (fbFavs.length > 0 || fbPlaylists.length > 0 || fbHistory.length > 0) {
             setFavorites(fbFavs);
             setPlaylists(fbPlaylists);
-            saveToLocal(fbFavs, fbPlaylists);
+            setRecentHistory(fbHistory);
+            saveToLocal(fbFavs, fbPlaylists, fbHistory);
           }
         }
       } catch (e) {
@@ -96,13 +98,17 @@ function App() {
     fetchSuggestions();
   }, []);
 
-  const syncData = async (newFavs, newPlaylists) => {
+  const syncData = async (newFavs, newPlaylists, newHistory) => {
     // Always save to localStorage (reliable)
-    saveToLocal(newFavs, newPlaylists);
+    saveToLocal(newFavs, newPlaylists, newHistory);
     
     // Try to sync to Firebase (cross-device)
     try {
-      await setDoc(doc(db, 'library', 'data'), { favorites: newFavs, playlists: newPlaylists });
+      await setDoc(doc(db, 'library', 'data'), { 
+        favorites: newFavs, 
+        playlists: newPlaylists,
+        history: newHistory || []
+      });
     } catch (e) {
       console.warn("Firebase sync failed:", e.message);
     }
@@ -134,7 +140,7 @@ function App() {
     
     setRecentHistory(prev => {
       const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 20);
-      saveToLocal(favorites, playlists, newHistory);
+      syncData(favorites, playlists, newHistory);
       return newHistory;
     });
 
@@ -176,7 +182,7 @@ function App() {
       newFavs = [...favorites, song];
     }
     setFavorites(newFavs);
-    syncData(newFavs, playlists);
+    syncData(newFavs, playlists, recentHistory);
   };
 
   const createPlaylist = (e) => {
@@ -190,7 +196,7 @@ function App() {
     const newPlaylists = [...playlists, newPlaylist];
     setPlaylists(newPlaylists);
     setNewPlaylistName('');
-    syncData(favorites, newPlaylists);
+    syncData(favorites, newPlaylists, recentHistory);
   };
 
   const addToPlaylist = (playlistId) => {
@@ -205,7 +211,7 @@ function App() {
     });
     setPlaylists(newPlaylists);
     setSongToAdd(null);
-    syncData(favorites, newPlaylists);
+    syncData(favorites, newPlaylists, recentHistory);
   };
 
   const renderSongList = (list) => {
