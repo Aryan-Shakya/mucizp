@@ -9,10 +9,11 @@ import './index.css';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
 // LocalStorage helpers for reliable fallback
-const saveToLocal = (favorites, playlists) => {
+const saveToLocal = (favorites, playlists, history = null) => {
   try {
     localStorage.setItem('mucizp_favorites', JSON.stringify(favorites));
     localStorage.setItem('mucizp_playlists', JSON.stringify(playlists));
+    if (history) localStorage.setItem('mucizp_history', JSON.stringify(history));
   } catch (e) { /* ignore quota errors */ }
 };
 
@@ -20,9 +21,10 @@ const loadFromLocal = () => {
   try {
     const favorites = JSON.parse(localStorage.getItem('mucizp_favorites') || '[]');
     const playlists = JSON.parse(localStorage.getItem('mucizp_playlists') || '[]');
-    return { favorites, playlists };
+    const history = JSON.parse(localStorage.getItem('mucizp_history') || '[]');
+    return { favorites, playlists, history };
   } catch (e) {
-    return { favorites: [], playlists: [] };
+    return { favorites: [], playlists: [], history: [] };
   }
 };
 
@@ -43,12 +45,18 @@ function App() {
   const [queue, setQueue] = useState([]);
   const [queueIndex, setQueueIndex] = useState(0);
 
+  const [homeSuggestions, setHomeSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+  
+  const [recentHistory, setRecentHistory] = useState([]);
+
   useEffect(() => {
     const loadData = async () => {
       // First load from localStorage (instant, always works)
       const local = loadFromLocal();
       setFavorites(local.favorites);
       setPlaylists(local.playlists);
+      setRecentHistory(local.history);
 
       // Then try Firebase for cross-device sync
       try {
@@ -70,6 +78,22 @@ function App() {
       }
     };
     loadData();
+
+    // Fetch home suggestions
+    const fetchSuggestions = async () => {
+      try {
+        setLoadingSuggestions(true);
+        // Default search for suggestions (e.g. popular hindi songs)
+        const response = await fetch(`${BACKEND_URL}/search?q=top+hindi`);
+        const data = await response.json();
+        setHomeSuggestions(data.songs || []);
+      } catch (err) {
+        console.error('Failed to load suggestions', err);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+    fetchSuggestions();
   }, []);
 
   const syncData = async (newFavs, newPlaylists) => {
@@ -93,13 +117,27 @@ function App() {
       setActiveTab('search');
     } catch (err) {
       console.error('Failed to search', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   };
 
   const playSong = async (song, fullQueue = null, index = 0) => {
     setCurrentSong({ ...song, loadingStream: false });
     
+    setRecentHistory(prev => {
+      const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 20);
+      saveToLocal(favorites, playlists, newHistory);
+      return newHistory;
+    });
+
     if (fullQueue) {
       setQueue(fullQueue);
       setQueueIndex(index);
@@ -118,7 +156,9 @@ function App() {
   const fetchLyrics = async (song) => {
     try {
       const artist = encodeURIComponent(song.artists[0] || '');
-      const title = encodeURIComponent(song.title);
+      // Remove text after parentheses, brackets, or hyphens to improve lyrics matching
+      const cleanTitle = song.title.replace(/(\(|\[|-).*$/, '').trim();
+      const title = encodeURIComponent(cleanTitle);
       const res = await fetch(`${BACKEND_URL}/lyrics?artist=${artist}&title=${title}`);
       const data = await res.json();
       return data.lyrics;
@@ -246,15 +286,81 @@ function App() {
       <main style={{ padding: '24px' }}>
         {activeTab === 'search' && (
           songs.length > 0 ? renderSongList(songs) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-secondary)' }}>
-              <ListVideo size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-              <p>Search for a song to start listening</p>
+            <div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '24px' }}>{getGreeting()}</h2>
+              <h3 style={{ fontSize: '18px', color: 'var(--text-secondary)', marginBottom: '16px' }}>Trending Suggestions</h3>
+              {loadingSuggestions ? (
+                <p style={{ color: 'var(--text-secondary)' }}>Loading suggestions...</p>
+              ) : homeSuggestions.length > 0 ? (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+                  gap: '20px' 
+                }}>
+                  {homeSuggestions.slice(0, 10).map((song, i) => (
+                    <div 
+                      key={song.id} 
+                      className="animate-slide-up"
+                      onClick={() => playSong(song, homeSuggestions, i)}
+                      style={{ 
+                        animationDelay: `${i * 0.05}s`,
+                        background: 'rgba(255, 255, 255, 0.05)', 
+                        padding: '16px', 
+                        borderRadius: '12px', 
+                        cursor: 'pointer',
+                        transition: 'background 0.2s, transform 0.2s',
+                        border: currentSong?.id === song.id ? '1px solid var(--accent)' : '1px solid transparent'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                    >
+                      <img src={song.thumbnail} alt={song.title} style={{ width: '100%', aspectRatio: '1', borderRadius: '8px', objectFit: 'cover', marginBottom: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }} />
+                      <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</h4>
+                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.artists.join(', ')}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '30vh', color: 'var(--text-secondary)' }}>
+                  <ListVideo size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                  <p>Search for a song to start listening</p>
+                </div>
+              )}
             </div>
           )
         )}
 
         {activeTab === 'library' && (
           <div>
+            <div style={{ marginBottom: '32px' }}>
+              <h2 style={{ marginBottom: '16px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Music size={20} color="var(--accent)" /> Recently Played
+              </h2>
+              {recentHistory.length > 0 ? (
+                <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'none' }}>
+                  {recentHistory.map((song, i) => (
+                    <div 
+                      key={`hist-${song.id}`} 
+                      onClick={() => playSong(song, recentHistory, i)}
+                      style={{ 
+                        minWidth: '120px', 
+                        width: '120px', 
+                        cursor: 'pointer',
+                        background: 'rgba(255,255,255,0.02)',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        border: currentSong?.id === song.id ? '1px solid var(--accent)' : '1px solid transparent'
+                      }}
+                    >
+                      <img src={song.thumbnail} alt={song.title} style={{ width: '100%', aspectRatio: '1', borderRadius: '8px', objectFit: 'cover', marginBottom: '8px' }} />
+                      <h4 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</h4>
+                      <p style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.artists.join(', ')}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : <p style={{ color: 'var(--text-secondary)' }}>No recent history.</p>}
+            </div>
+
             <div style={{ marginBottom: '32px' }}>
               <h2 style={{ marginBottom: '16px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Heart size={20} color="var(--accent)" /> Favorites
