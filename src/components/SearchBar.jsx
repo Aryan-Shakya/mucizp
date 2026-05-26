@@ -5,9 +5,13 @@ export default function SearchBar({ onSearch, loading }) {
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    if (query.trim().length >= 3) {
-      onSearch(query.trim());
-    }
+    const timer = setTimeout(() => {
+      if (query.trim().length >= 3) {
+        onSearch(query.trim());
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, [query, onSearch]);
 
   const handleSubmit = (e) => {
