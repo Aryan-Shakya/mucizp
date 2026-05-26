@@ -605,7 +605,16 @@ function App() {
         </div>
       )}
 
-      {currentSong && <Player currentSong={currentSong} onNext={playNext} fetchLyrics={fetchLyrics} />}
+      {currentSong && (
+        <Player 
+          currentSong={currentSong} 
+          onNext={playNext} 
+          fetchLyrics={fetchLyrics} 
+          isFav={favorites.some(f => f.id === currentSong.id)}
+          toggleFavorite={toggleFavorite}
+          onAdd={() => setSongToAdd(currentSong)}
+        />
+      )}
     </div>
   );
 }

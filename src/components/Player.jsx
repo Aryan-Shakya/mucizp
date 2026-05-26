@@ -1,9 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X, AlertCircle } from 'lucide-react';
+import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X, AlertCircle, ChevronDown, Heart, Plus } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
-export default function Player({ currentSong, onNext, fetchLyrics }) {
+export default function Player({ currentSong, onNext, fetchLyrics, isFav, toggleFavorite, onAdd }) {
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -16,6 +16,7 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
   const [error, setError] = useState(null);
   const [loadingAudio, setLoadingAudio] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   // Fetch audio stream when song changes
   useEffect(() => {
@@ -168,7 +169,7 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
         />
       )}
 
-      <div className="glass" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 100 }}>
+      <div className="glass" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 100, transform: isFullScreen ? 'translateY(100%)' : 'translateY(0)', transition: 'transform 0.3s ease' }}>
         {/* Error Banner */}
         {error && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'rgba(255,80,80,0.15)', borderRadius: '8px', color: '#ff6b6b', fontSize: '13px' }}>
@@ -188,7 +189,7 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Track Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+          <div onClick={() => setIsFullScreen(true)} style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, cursor: 'pointer' }}>
             <img src={currentSong.thumbnail} alt="cover" style={{ width: '48px', height: '48px', borderRadius: '6px', objectFit: 'cover' }} />
             <div>
               <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' }}>
@@ -221,8 +222,78 @@ export default function Player({ currentSong, onNext, fetchLyrics }) {
         </div>
       </div>
 
-      {/* Lyrics Modal */}
-      {showLyrics && (
+      {/* Full Screen Player */}
+      {isFullScreen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(to bottom, #2b2b2b, #121212)', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: '24px', overflowY: 'auto' }}>
+          
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+            <button onClick={() => setIsFullScreen(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}><ChevronDown size={32} /></button>
+            <span style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '1px' }}>NOW PLAYING</span>
+            <div style={{ width: '32px' }}></div>
+          </div>
+
+          {/* Large Art */}
+          <div style={{ width: '100%', maxWidth: '400px', aspectRatio: '1', margin: '0 auto 40px', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+            <img src={currentSong.thumbnail.replace('sddefault', 'maxresdefault').replace('hq720', 'maxresdefault')} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => {e.target.src = currentSong.thumbnail}} />
+          </div>
+
+          {/* Title & Actions Row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', margin: '0 0 4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentSong.title}</h2>
+              <p style={{ fontSize: '16px', color: 'var(--text-secondary)', margin: 0 }}>{currentSong.artists.join(', ')}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '16px', marginLeft: '16px' }}>
+              <button onClick={(e) => toggleFavorite(currentSong, e)} style={{ background: 'transparent', border: 'none', color: isFav ? 'var(--accent)' : '#fff', cursor: 'pointer' }}>
+                <Heart size={28} fill={isFav ? "currentColor" : "none"} />
+              </button>
+              <button onClick={() => { setIsFullScreen(false); onAdd(); }} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>
+                <Plus size={28} />
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Bar (Full Screen) */}
+          <div style={{ maxWidth: '600px', margin: '0 auto 32px', width: '100%' }}>
+            <div onClick={handleSeek} style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.2)', borderRadius: '3px', cursor: 'pointer', position: 'relative', marginBottom: '8px' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${progress}%`, background: '#fff', borderRadius: '3px', transition: 'width 0.1s linear' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(duration)}</span>
+            </div>
+          </div>
+
+          {/* Controls (Full Screen) */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '32px', maxWidth: '600px', margin: '0 auto 40px', width: '100%' }}>
+            <button onClick={togglePlay} disabled={loadingAudio} style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#fff', color: '#000', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loadingAudio ? 'wait' : 'pointer', opacity: loadingAudio ? 0.7 : 1 }}>
+              {loadingAudio ? <Loader2 size={32} className="animate-spin" /> : isPlaying ? <Pause fill="currentColor" size={32} /> : <Play fill="currentColor" size={32} style={{ marginLeft: '4px' }} />}
+            </button>
+            <button onClick={onNext} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>
+              <SkipForward size={36} />
+            </button>
+          </div>
+
+          {/* Lyrics Box */}
+          <div style={{ maxWidth: '600px', margin: '0 auto 60px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '16px', padding: '24px', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>Lyrics</h3>
+              {!lyrics && <button onClick={toggleLyrics} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>{loadingLyrics ? 'Loading...' : 'Show Lyrics'}</button>}
+            </div>
+            {lyrics && (
+              <div style={{ maxHeight: '300px', overflowY: 'auto', paddingRight: '16px' }}>
+                <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '18px', lineHeight: '1.8', color: '#fff', margin: 0 }}>
+                  {lyrics}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Legacy Lyrics Modal for Mini Player */}
+      {showLyrics && !isFullScreen && (
         <div style={{ position: 'fixed', inset: 0, bottom: '100px', background: 'rgba(0,0,0,0.95)', zIndex: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', overflowY: 'auto' }}>
           <button onClick={toggleLyrics} style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '8px', borderRadius: '50%', cursor: 'pointer' }}><X size={20} /></button>
           <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>{currentSong.title}</h2>
