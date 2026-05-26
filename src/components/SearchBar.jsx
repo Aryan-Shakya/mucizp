@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 
 export default function SearchBar({ onSearch, loading }) {
   const [query, setQuery] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (query.trim()) {
+  useEffect(() => {
+    if (query.trim().length >= 3) {
       onSearch(query.trim());
     }
+  }, [query, onSearch]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
   };
 
   return (
