@@ -6,7 +6,7 @@ import { db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import './index.css';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://mucizp.vercel.app/api';
 
 // LocalStorage helpers for reliable fallback
 const saveToLocal = (favorites, playlists, history = null) => {

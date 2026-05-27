@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X, AlertCircle, ChevronDown, Heart, Plus } from 'lucide-react';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/api';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://mucizp.vercel.app/api';
 
 export default function Player({ currentSong, onNext, fetchLyrics, isFav, toggleFavorite, onAdd }) {
   const audioRef = useRef(null);
