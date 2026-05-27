@@ -25,7 +25,7 @@ def read_root():
 @app.get("/search")
 def search_songs(q: str):
     try:
-        url = f"https://www.jiosaavn.com/api.php?__call=search.getResults&q={q}&n=15&p=1&_format=json&_marker=0&ctx=web6dot0"
+        url = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&query={q}&_format=json&_marker=0&ctx=web6dot0"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "X-Forwarded-For": "103.116.251.10" # Indian IP to bypass Vercel US region block
@@ -38,32 +38,26 @@ def search_songs(q: str):
             raise HTTPException(status_code=502, detail="Failed to parse JioSaavn search response. Possibly blocked by Cloudflare.")
         
         songs = []
-        items = data.get('results', [])
-        # Sort items by play_count descending to push original popular songs to the top
-        items = sorted(items, key=lambda x: int(x.get('play_count', 0)) if str(x.get('play_count', 0)).isdigit() else 0, reverse=True)
+        items = data.get('songs', {}).get('data', [])
         
         for item in items:
-            title = html.unescape(item.get('song', item.get('title', '')))
+            title = html.unescape(item.get('title', ''))
             
-            # Extract artists
-            artists_str = item.get('singers') or item.get('primary_artists') or ""
-            artists_str = html.unescape(artists_str)
-            artists = [a.strip() for a in artists_str.split(',')] if artists_str else []
+            # Autocomplete provides description like "Ed Sheeran · Shape of You"
+            desc = html.unescape(item.get('description', ''))
+            # Try to extract just the artist
+            artists_str = desc.split('·')[0].split('')[0].split('-')[0].strip() if desc else ""
+            artists = [artists_str] if artists_str else []
             
             # Use high-res image
-            image = item.get('image', '').replace("150x150", "500x500").replace("50x50", "500x500")
+            image = item.get('image', '').replace("50x50", "500x500").replace("150x150", "500x500")
             
-            try:
-                duration = int(item.get('duration', 0))
-            except:
-                duration = 0
-                
             songs.append({
                 "id": item.get('id'),
                 "title": title,
                 "artists": artists,
                 "thumbnail": image,
-                "duration": duration,
+                "duration": 0,
             })
             
         return {"songs": songs}
