@@ -25,40 +25,75 @@ def read_root():
 @app.get("/search")
 def search_songs(q: str):
     try:
-        url = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&query={q}&_format=json&_marker=0&ctx=web6dot0"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "X-Forwarded-For": "103.116.251.10" # Indian IP to bypass Vercel US region block
+            "X-Forwarded-For": "103.116.251.10" # Indian IP
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        
+        # 1. Fetch autocomplete (guarantees global top hits, bypassing region blocks)
+        url_auto = f"https://www.jiosaavn.com/api.php?__call=autocomplete.get&query={q}&_format=json&_marker=0&ctx=web6dot0"
+        res_auto = requests.get(url_auto, headers=headers, timeout=10)
+        
+        # 2. Fetch full search (provides 15+ results, but prone to region block cover songs on Vercel US)
+        url_full = f"https://www.jiosaavn.com/api.php?__call=search.getResults&q={q}&n=15&p=1&_format=json&_marker=0&ctx=web6dot0"
+        res_full = requests.get(url_full, headers=headers, timeout=10)
         
         try:
-            data = response.json()
+            data_auto = res_auto.json()
+            data_full = res_full.json()
         except Exception:
-            raise HTTPException(status_code=502, detail="Failed to parse JioSaavn search response. Possibly blocked by Cloudflare.")
+            raise HTTPException(status_code=502, detail="Failed to parse JioSaavn search response.")
         
         songs = []
-        items = data.get('songs', {}).get('data', [])
+        seen_ids = set()
         
-        for item in items:
-            title = html.unescape(item.get('title', ''))
+        # Parse Autocomplete
+        auto_items = data_auto.get('songs', {}).get('data', [])
+        for item in auto_items:
+            id = item.get('id')
+            if not id or id in seen_ids: continue
             
-            # Autocomplete provides description like "Ed Sheeran · Shape of You"
+            title = html.unescape(item.get('title', ''))
             desc = html.unescape(item.get('description', ''))
-            # Try to extract just the artist
             artists_str = desc.split('·')[0].split('-')[0].strip() if desc else ""
             artists = [artists_str] if artists_str else []
-            
-            # Use high-res image
             image = item.get('image', '').replace("50x50", "500x500").replace("150x150", "500x500")
             
             songs.append({
-                "id": item.get('id'),
+                "id": id,
                 "title": title,
                 "artists": artists,
                 "thumbnail": image,
                 "duration": 0,
             })
+            seen_ids.add(id)
+            
+        # Parse Full Search (sort by play_count just in case)
+        full_items = data_full.get('results', [])
+        full_items = sorted(full_items, key=lambda x: int(x.get('play_count', 0)) if str(x.get('play_count', 0)).isdigit() else 0, reverse=True)
+        
+        for item in full_items:
+            id = item.get('id')
+            if not id or id in seen_ids: continue
+            
+            title = html.unescape(item.get('song', item.get('title', '')))
+            artists_str = item.get('singers') or item.get('primary_artists') or ""
+            artists_str = html.unescape(artists_str)
+            artists = [a.strip() for a in artists_str.split(',')] if artists_str else []
+            image = item.get('image', '').replace("150x150", "500x500").replace("50x50", "500x500")
+            try:
+                duration = int(item.get('duration', 0))
+            except:
+                duration = 0
+                
+            songs.append({
+                "id": id,
+                "title": title,
+                "artists": artists,
+                "thumbnail": image,
+                "duration": duration,
+            })
+            seen_ids.add(id)
             
         return {"songs": songs}
     except Exception as e:
