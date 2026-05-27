@@ -4,16 +4,6 @@ import { Search, Loader2 } from 'lucide-react';
 export default function SearchBar({ onSearch, loading }) {
   const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (query.trim().length >= 3) {
-        onSearch(query.trim());
-      }
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, [query, onSearch]);
-
   const handleSubmit = (e) => {
     e.preventDefault();
     if (query.trim().length > 0) {
