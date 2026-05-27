@@ -69,7 +69,7 @@ def search_songs(q: str):
 
 @app.get("/api/stream")
 @app.get("/stream")
-def get_stream_url(video_id: str):
+def get_stream_url(video_id: str, quality: str = "high"):
     try:
         url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={video_id}&_format=json&_marker=0&ctx=web6dot0"
         headers = {
@@ -92,8 +92,9 @@ def get_stream_url(video_id: str):
         enc_url = base64.b64decode(encrypted_url.strip())
         dec_url = des_cipher.decrypt(enc_url, padmode=PAD_PKCS5).decode('utf-8')
         
-        # Try to get highest quality (320kbps)
-        dec_url = dec_url.replace("_96.mp4", "_320.mp4")
+        # Default is 96kbps. If high quality requested, replace with 320kbps.
+        if quality != "low":
+            dec_url = dec_url.replace("_96.mp4", "_320.mp4")
         
         return {"url": dec_url}
         

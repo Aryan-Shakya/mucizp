@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SearchBar from './components/SearchBar';
 import Player from './components/Player';
-import { Music, ListVideo, Heart, Plus, ListMusic, X } from 'lucide-react';
+import { Music, ListVideo, Heart, Plus, ListMusic, X, Wifi, WifiOff } from 'lucide-react';
 import { db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import './index.css';
@@ -56,6 +56,16 @@ function App() {
 
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
   const [editPlaylistName, setEditPlaylistName] = useState('');
+
+  const [dataSaver, setDataSaver] = useState(() => {
+    return localStorage.getItem('mucizp_datasaver') === 'true';
+  });
+
+  const toggleDataSaver = () => {
+    const newVal = !dataSaver;
+    setDataSaver(newVal);
+    localStorage.setItem('mucizp_datasaver', newVal.toString());
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -360,12 +370,22 @@ function App() {
           >
             <Music color="var(--accent)" /> Mucizp
           </h1>
-          <button 
-            onClick={() => setActiveTab('library')}
-            style={{ background: activeTab === 'library' ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}
-          >
-            <ListMusic size={18} /> My Library
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button 
+              onClick={toggleDataSaver}
+              style={{ background: dataSaver ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid ' + (dataSaver ? 'var(--accent)' : 'transparent'), color: dataSaver ? 'var(--accent)' : 'var(--text-secondary)', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500', transition: 'all 0.2s' }}
+              title="Data Saver (96kbps streams)"
+            >
+              {dataSaver ? <WifiOff size={16} /> : <Wifi size={16} />}
+              <span style={{ fontSize: '12px' }}>{dataSaver ? 'Data Saver On' : 'Data Saver Off'}</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('library')}
+              style={{ background: activeTab === 'library' ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}
+            >
+              <ListMusic size={18} /> My Library
+            </button>
+          </div>
         </div>
         {activeTab === 'search' && (
           <div style={{ marginTop: '16px' }}>
@@ -613,6 +633,7 @@ function App() {
           isFav={favorites.some(f => f.id === currentSong.id)}
           toggleFavorite={toggleFavorite}
           onAdd={() => setSongToAdd(currentSong)}
+          dataSaver={dataSaver}
         />
       )}
     </div>

@@ -3,7 +3,7 @@ import { Play, Pause, Loader2, Volume2, SkipForward, FileText, X, AlertCircle, C
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://mucizp.vercel.app/api';
 
-export default function Player({ currentSong, onNext, fetchLyrics, isFav, toggleFavorite, onAdd }) {
+export default function Player({ currentSong, onNext, fetchLyrics, isFav, toggleFavorite, onAdd, dataSaver }) {
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
