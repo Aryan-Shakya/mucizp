@@ -38,7 +38,7 @@ export default function Player({ currentSong, onNext, fetchLyrics, isFav, toggle
         const data = await res.json();
         
         if (!cancelled && data.url) {
-          setAudioUrl(data.url);
+          setAudioUrl(data.url.replace('http://', 'https://'));
           setLoadingAudio(false);
         }
       } catch (e) {
