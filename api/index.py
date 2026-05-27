@@ -46,7 +46,7 @@ def search_songs(q: str):
             # Autocomplete provides description like "Ed Sheeran · Shape of You"
             desc = html.unescape(item.get('description', ''))
             # Try to extract just the artist
-            artists_str = desc.split('·')[0].split('')[0].split('-')[0].strip() if desc else ""
+            artists_str = desc.split('·')[0].split('-')[0].strip() if desc else ""
             artists = [artists_str] if artists_str else []
             
             # Use high-res image
