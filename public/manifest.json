@@ -4,14 +4,20 @@
   "version": "1.0.0",
   "description": "Your ultimate, cross-platform music streaming experience.",
   "action": {
-    "default_popup": "index.html",
-    "default_title": "Open Mucizp"
+    "default_title": "Open Mucizp Side Panel"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "index.html"
   },
   "host_permissions": [
     "*://*/*"
   ],
   "permissions": [
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; media-src 'self' https://* http://*;"
