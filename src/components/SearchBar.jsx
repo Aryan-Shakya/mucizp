@@ -9,13 +9,16 @@ export default function SearchBar({ onSearch, loading }) {
       if (query.trim().length >= 3) {
         onSearch(query.trim());
       }
-    }, 400);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, [query, onSearch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (query.trim().length > 0) {
+      onSearch(query.trim());
+    }
   };
 
   return (
