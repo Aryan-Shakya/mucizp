@@ -38,6 +38,8 @@ def search_songs(q: str):
         
         songs = []
         items = data.get('results', [])
+        # Sort items by play_count descending to push original popular songs to the top
+        items = sorted(items, key=lambda x: int(x.get('play_count', 0)) if str(x.get('play_count', 0)).isdigit() else 0, reverse=True)
         
         for item in items:
             title = html.unescape(item.get('song', item.get('title', '')))
