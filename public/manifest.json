@@ -9,15 +9,11 @@
   "background": {
     "service_worker": "background.js"
   },
-  "side_panel": {
-    "default_path": "index.html"
-  },
   "host_permissions": [
     "*://*/*"
   ],
   "permissions": [
-    "storage",
-    "sidePanel"
+    "storage"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; media-src 'self' https://* http://*;"
