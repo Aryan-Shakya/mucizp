@@ -27,7 +27,8 @@ def search_songs(q: str):
     try:
         url = f"https://www.jiosaavn.com/api.php?__call=search.getResults&q={q}&n=15&p=1&_format=json&_marker=0&ctx=web6dot0"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "X-Forwarded-For": "103.116.251.10" # Indian IP to bypass Vercel US region block
         }
         response = requests.get(url, headers=headers, timeout=10)
         
@@ -75,7 +76,8 @@ def get_stream_url(video_id: str, quality: str = "high"):
     try:
         url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&pids={video_id}&_format=json&_marker=0&ctx=web6dot0"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "X-Forwarded-For": "103.116.251.10"
         }
         response = requests.get(url, headers=headers, timeout=10)
         
